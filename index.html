@@ -160,7 +160,7 @@ function draw(){D.forEach((d,i)=>{G[i].style.display=en[i]?"":"none";G[i].setAtt
 L[i].classList.toggle("hide",!en[i]||(isQ()?!st[i]:(mode==="timed"||!$("showlbl").checked)))})}
 function setMode(m){hideVeil();$("toast").classList.add("hide");$("end").classList.add("hide");mode=m;sel=-1;ok=0;tries=0;pts=0;lastRk="";st.fill(0);clearInterval(tm);const q=m!=="study",T=m==="timed";$("start").classList.add("hide");
 $("b-study").classList.toggle("on",!q);$("b-quiz").classList.toggle("on",m==="quiz");$("b-ranked").classList.toggle("on",m==="ranked");$("b-timed").classList.toggle("on",T);
-["skip","snw","score","pbox","reset"].forEach(i=>$(i).classList.toggle("hide",!q));["hint","half","reveal"].forEach(i=>$(i).classList.toggle("hide",m!=="quiz"));if(m==="ranked")$("skip").classList.add("hide");$("timer").classList.toggle("hide",!T);$("rank").classList.toggle("hide",m!=="ranked");$("rkp").classList.toggle("hide",m!=="ranked");$("sw").classList.toggle("hide",q);
+["skip","snw","score","pbox","reset"].forEach(i=>$(i).classList.toggle("hide",!q));["hint","half","reveal"].forEach(i=>$(i).classList.toggle("hide",m!=="quiz"));if(m==="ranked")$("skip").classList.add("hide");$("timer").classList.toggle("hide",!T);$("rank").classList.toggle("hide",m!=="ranked");$("rkp").classList.toggle("hide",m!=="ranked");if(m==="ranked")loadOnline();$("sw").classList.toggle("hide",q);
 if(q){deck=D.map((_,i)=>i).filter(i=>en[i]).sort(()=>Math.random()-.5);if(!deck.length){cur=-1;say("Zaznacz przynajmniej jedną rzekę poniżej.");upd();draw();return}$("start").classList.toggle("hide",!T);if(T){cur=-1;$("skip").classList.add("hide");$("timer").textContent="⏱ 5:00";$("timer").style.color="";say("Kliknij Start, żeby ruszył czas (5:00).");upd();draw();return}next();return}say("Kliknij kropkę, żeby zobaczyć nazwę rzeki.");upd();draw()}
 function next(pre){hideVeil();sel=-1;miss=0;hinted=0;half=0;while(deck.length&&st[deck[deck.length-1]])deck.pop();if(!deck.length){cur=-1;clearInterval(tm);setTimeout(showEnd,900);say("🎉 Koniec! Punkty: "+pts+"/"+cnt()*3+" · Zgadnięte: "+ok+"/"+cnt()+" w "+tries+" kliknięciach. Kliknij „Od nowa”.","ok")}else{cur=deck.pop();say(D[cur][2],"big")}upd();draw()}
 function pick(i){
@@ -205,29 +205,34 @@ let hist=(()=>{try{return JSON.parse(localStorage.getItem("rzeki_rk")||"[]")}cat
 function renderRuns(hl){document.querySelector("#rkt tbody").innerHTML=hist.length?hist.map((x,i)=>'<tr'+(x.t===hl?' class="hl"':'')+'><td>'+(i+1)+'</td><td><img src="'+RIMG[x.r]+'">'+x.r+'</td><td>'+x.p+' / '+x.m+'</td></tr>').join(""):'<tr><td colspan="3">Brak wyników – zagraj pierwszą rundę</td></tr>'}
 function saveRun(rn){const t=Date.now();hist.push({p:pts,m:cnt()*3,r:rn[1],t});hist.sort((x,y)=>y.p/y.m-x.p/x.m||y.t-x.t);hist=hist.slice(0,8);try{localStorage.setItem("rzeki_rk",JSON.stringify(hist))}catch(e){}renderRuns(t)}
 renderRuns();
-let db=null,uid=null,nick="",pend=null;
+// >>> Wklej tu adres swojej bazy Firebase Realtime Database, np. "https://twoj-projekt-default-rtdb.europe-west1.firebasedatabase.app"
+const FB_URL="https://geo41rzek-default-rtdb.europe-west1.firebasedatabase.app";
+let nick="",pend=null;
 try{nick=localStorage.getItem("rzeki_nick")||""}catch(e){}
 $("unm").value=nick;
 const hasR=k=>Object.prototype.hasOwnProperty.call(RIMG,k);
+const keyOf=n=>n.toLowerCase().replace(/[.$#\[\]\/\x00-\x1f\x7f]/g,"_");
+const base=()=>FB_URL.replace(/\/+$/,"");
 function ost(t){$("ost").textContent=t}
-function renderOnline(docs){const tb=document.querySelector("#lbt tbody");tb.textContent="";
-if(!docs.length){const r=tb.insertRow(),c=r.insertCell();c.colSpan=4;c.textContent="Brak wyników – bądź pierwszy!";return}
-docs.map(d=>{const x=d.data()||{};return{id:d.id,n:String(x.n||"?").slice(0,16),p:+x.p||0,m:+x.m||123,r:String(x.r||""),t:+x.t||0}}).sort((a,b)=>b.p-a.p||a.t-b.t).forEach((x,i)=>{const r=tb.insertRow();if(x.id===uid)r.className="hl";r.insertCell().textContent=i+1;r.insertCell().textContent=x.n;const cr=r.insertCell();if(hasR(x.r)){const im=new Image();im.src=RIMG[x.r];cr.appendChild(im);cr.append(x.r)}r.insertCell().textContent=x.p+" / "+x.m})}
-async function submitScore(o){if(!db||!uid)return;
+function renderOnline(list){const tb=document.querySelector("#lbt tbody");tb.textContent="";
+if(!list.length){const r=tb.insertRow(),c=r.insertCell();c.colSpan=4;c.textContent="Brak wyników – bądź pierwszy!";return}
+const me=nick?keyOf(nick):"";
+list.map(x=>({id:x.id,n:String(x.n||"?").slice(0,16),p:+x.p||0,m:+x.m||123,r:String(x.r||""),t:+x.t||0})).sort((a,b)=>b.p-a.p||a.t-b.t).slice(0,20).forEach((x,i)=>{const r=tb.insertRow();if(x.id===me)r.className="hl";r.insertCell().textContent=i+1;r.insertCell().textContent=x.n;const cr=r.insertCell();if(hasR(x.r)){const im=new Image();im.src=RIMG[x.r];cr.appendChild(im);cr.append(x.r)}r.insertCell().textContent=x.p+" / "+x.m})}
+async function loadOnline(){if(!FB_URL)return;try{const r=await fetch(base()+"/ranking.json");if(!r.ok)throw 0;const o=await r.json()||{};renderOnline(Object.keys(o).map(k=>Object.assign({id:k},o[k])))}catch(e){ost("Nie można pobrać rankingu online.")}}
+async function submitScore(o){if(!FB_URL)return;
 if(cnt()!==D.length){ost("Do rankingu online liczą się tylko rundy ze wszystkimi "+D.length+" rzekami.");return}
 if(!nick){pend=o;ost("Wpisz nick i kliknij „Zapisz nick”, żeby wysłać wynik ("+o.p+" pkt).");return}
-try{const ref=db.collection("ranking").doc(uid),sn=await ref.get(),old=sn.exists?sn.data():null;
-if(old&&+old.p>=o.p){if(old.n!==nick)await ref.update({n:nick});ost("Twój rekord w rankingu online: "+old.p+" pkt.");return}
-await ref.set({n:nick,p:o.p,m:cnt()*3,r:o.r,t:Date.now()});ost("Wynik wysłany do rankingu online!")}
-catch(e){ost(e&&e.code==="invalid_argument"?"Nie możesz wysyłać wyników – masz tylko podgląd. Poproś właściciela strony o uprawnienia współtwórcy (Contributor).":"Nie udało się wysłać wyniku, spróbuj później.")}}
+const url=base()+"/ranking/"+encodeURIComponent(keyOf(nick))+".json";
+try{const old=await(await fetch(url)).json();
+if(old&&+old.p>=o.p){ost("Rekord pod tym nickiem w rankingu online: "+old.p+" pkt.");if(old.n!==nick)await fetch(url,{method:"PUT",body:JSON.stringify(Object.assign({},old,{n:nick}))});await loadOnline();return}
+const w=await fetch(url,{method:"PUT",body:JSON.stringify({n:nick,p:o.p,m:123,r:o.r,t:Date.now()})});
+if(!w.ok)throw 0;ost("Wynik wysłany do rankingu online!");await loadOnline()}
+catch(e){ost("Nie udało się wysłać wyniku (sprawdź połączenie i reguły bazy).")}}
 $("usave").onclick=async()=>{const v=$("unm").value.trim().replace(/\s+/g," ").slice(0,16);if(!v){ost("Wpisz nick (1–16 znaków).");return}
 nick=v;$("unm").value=v;try{localStorage.setItem("rzeki_nick",v)}catch(e){}ost("Nick zapisany: "+v);
-if(pend){const o=pend;pend=null;await submitScore(o)}
-else if(db&&uid){try{const ref=db.collection("ranking").doc(uid),sn=await ref.get();if(sn.exists)await ref.update({n:v})}catch(e){}}};
-(async()=>{try{if(typeof claude==="undefined")throw 0;const u=await claude.use("user");uid=u?await u.id():null;db=await claude.use("db")}catch(e){db=null}
-if(!db||!uid){ost("Ranking online jest niedostępny w tym widoku.");return}
-const tm0=setTimeout(()=>ost("Nie można jeszcze pobrać rankingu online…"),10000);
-db.collection("ranking").orderBy("p","desc").limit(20).onSnapshot(sn=>{clearTimeout(tm0);renderOnline(sn.docs)},e=>{clearTimeout(tm0);ost("Ranking online niedostępny ("+(e&&e.code)+").")})})();
+if(pend){const o=pend;pend=null;await submitScore(o)}else loadOnline()};
+if(!FB_URL)ost("Ranking online nie jest jeszcze skonfigurowany (brak adresu bazy w pliku).");
+else{loadOnline();setInterval(()=>{if(mode==="ranked")loadOnline()},30000)}
 renderOnline([]);
 
 function rankOf(){const max=cnt()*3,p=max?pts*123/max:0;return RK.find(r=>p>=r[0]-1e-9)}
