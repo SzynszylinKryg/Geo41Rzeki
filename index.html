@@ -24,6 +24,9 @@ button.on{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:6
 .rbig{height:7rem;filter:drop-shadow(0 4px 10px rgba(0,0,0,.45))}
 #rkp{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:12px 14px}
 .rkh{font-weight:800;margin-bottom:8px}
+.unrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+#unm{background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;width:170px;color:var(--tx);font:inherit}
+#ost{color:var(--mut);font-size:.85rem;flex:1 1 220px}
 .rkin{position:relative;margin:0 44px 14px}
 #rkb{position:relative;height:122px}
 .rb{position:absolute;bottom:0;transform:translateX(-50%);text-align:center;transition:transform .3s,opacity .3s,filter .3s;font-size:.8rem;font-weight:700}
@@ -33,11 +36,11 @@ button.on{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:6
 .rktrack{position:relative;height:10px;border-radius:99px;background:var(--bg);border:1px solid var(--ln);margin-top:8px}
 #rkfill{height:100%;width:0;border-radius:99px;transition:width .8s cubic-bezier(.2,.8,.2,1),background .4s}
 .rktrack i{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid var(--card)}
-#rkt{width:100%;border-collapse:collapse;font-size:.95rem}
-#rkt th{text-align:left;color:var(--mut);font-weight:600;padding:4px 6px}
-#rkt td{padding:5px 6px;border-top:1px solid var(--ln)}
-#rkt td img{height:28px;vertical-align:middle;margin-right:6px}
-#rkt tr.hl td{background:rgba(255,200,0,.18);font-weight:700}
+#rkt,#lbt{width:100%;border-collapse:collapse;font-size:.95rem}
+#rkt th,#lbt th{text-align:left;color:var(--mut);font-weight:600;padding:4px 6px}
+#rkt td,#lbt td{padding:5px 6px;border-top:1px solid var(--ln)}
+#rkt td img,#lbt td img{height:28px;vertical-align:middle;margin-right:6px}
+#rkt tr.hl td,#lbt tr.hl td{background:rgba(255,200,0,.18);font-weight:700}
 input[type=text]{background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;width:180px}
 label{color:var(--mut);font-size:.9rem;display:flex;gap:6px;align-items:center}
 .hide{display:none!important}
@@ -123,7 +126,11 @@ svg{display:block;width:100%;height:auto;margin:0 auto}
 <div id="rkp" class="hide">
 <div class="rkh">🏆 Ranking</div>
 <div class="rkin"><div id="rkb"></div><div class="rktrack" id="rktrack"></div></div>
+<div class="rkh">Twoje najlepsze rundy</div>
 <table id="rkt"><thead><tr><th>#</th><th>Ranga</th><th>Twoje punkty</th></tr></thead><tbody></tbody></table>
+<div class="rkh" style="margin-top:16px">🌍 Ranking online</div>
+<div class="unrow"><input id="unm" type="text" maxlength="16" placeholder="Twój nick" autocomplete="off"><button id="usave">Zapisz nick</button><span id="ost">Do rankingu online liczą się rundy Ranked ze wszystkimi rzekami.</span></div>
+<table id="lbt"><thead><tr><th>#</th><th>Gracz</th><th>Ranga</th><th>Punkty</th></tr></thead><tbody></tbody></table>
 </div>
 <details class="rv"><summary>🌊 Rzeki (<span id="rc">41/41</span>)</summary>
 <div class="rvb"><button id="rall">Zaznacz wszystkie</button><button id="rnone">Odznacz wszystkie</button></div>
@@ -198,9 +205,34 @@ let hist=(()=>{try{return JSON.parse(localStorage.getItem("rzeki_rk")||"[]")}cat
 function renderRuns(hl){document.querySelector("#rkt tbody").innerHTML=hist.length?hist.map((x,i)=>'<tr'+(x.t===hl?' class="hl"':'')+'><td>'+(i+1)+'</td><td><img src="'+RIMG[x.r]+'">'+x.r+'</td><td>'+x.p+' / '+x.m+'</td></tr>').join(""):'<tr><td colspan="3">Brak wyników – zagraj pierwszą rundę</td></tr>'}
 function saveRun(rn){const t=Date.now();hist.push({p:pts,m:cnt()*3,r:rn[1],t});hist.sort((x,y)=>y.p/y.m-x.p/x.m||y.t-x.t);hist=hist.slice(0,8);try{localStorage.setItem("rzeki_rk",JSON.stringify(hist))}catch(e){}renderRuns(t)}
 renderRuns();
+let db=null,uid=null,nick="",pend=null;
+try{nick=localStorage.getItem("rzeki_nick")||""}catch(e){}
+$("unm").value=nick;
+const hasR=k=>Object.prototype.hasOwnProperty.call(RIMG,k);
+function ost(t){$("ost").textContent=t}
+function renderOnline(docs){const tb=document.querySelector("#lbt tbody");tb.textContent="";
+if(!docs.length){const r=tb.insertRow(),c=r.insertCell();c.colSpan=4;c.textContent="Brak wyników – bądź pierwszy!";return}
+docs.map(d=>{const x=d.data()||{};return{id:d.id,n:String(x.n||"?").slice(0,16),p:+x.p||0,m:+x.m||123,r:String(x.r||""),t:+x.t||0}}).sort((a,b)=>b.p-a.p||a.t-b.t).forEach((x,i)=>{const r=tb.insertRow();if(x.id===uid)r.className="hl";r.insertCell().textContent=i+1;r.insertCell().textContent=x.n;const cr=r.insertCell();if(hasR(x.r)){const im=new Image();im.src=RIMG[x.r];cr.appendChild(im);cr.append(x.r)}r.insertCell().textContent=x.p+" / "+x.m})}
+async function submitScore(o){if(!db||!uid)return;
+if(cnt()!==D.length){ost("Do rankingu online liczą się tylko rundy ze wszystkimi "+D.length+" rzekami.");return}
+if(!nick){pend=o;ost("Wpisz nick i kliknij „Zapisz nick”, żeby wysłać wynik ("+o.p+" pkt).");return}
+try{const ref=db.collection("ranking").doc(uid),sn=await ref.get(),old=sn.exists?sn.data():null;
+if(old&&+old.p>=o.p){if(old.n!==nick)await ref.update({n:nick});ost("Twój rekord w rankingu online: "+old.p+" pkt.");return}
+await ref.set({n:nick,p:o.p,m:cnt()*3,r:o.r,t:Date.now()});ost("Wynik wysłany do rankingu online!")}
+catch(e){ost(e&&e.code==="invalid_argument"?"Nie możesz wysyłać wyników – masz tylko podgląd. Poproś właściciela strony o uprawnienia współtwórcy (Contributor).":"Nie udało się wysłać wyniku, spróbuj później.")}}
+$("usave").onclick=async()=>{const v=$("unm").value.trim().replace(/\s+/g," ").slice(0,16);if(!v){ost("Wpisz nick (1–16 znaków).");return}
+nick=v;$("unm").value=v;try{localStorage.setItem("rzeki_nick",v)}catch(e){}ost("Nick zapisany: "+v);
+if(pend){const o=pend;pend=null;await submitScore(o)}
+else if(db&&uid){try{const ref=db.collection("ranking").doc(uid),sn=await ref.get();if(sn.exists)await ref.update({n:v})}catch(e){}}};
+(async()=>{try{if(typeof claude==="undefined")throw 0;const u=await claude.use("user");uid=u?await u.id():null;db=await claude.use("db")}catch(e){db=null}
+if(!db||!uid){ost("Ranking online jest niedostępny w tym widoku.");return}
+const tm0=setTimeout(()=>ost("Nie można jeszcze pobrać rankingu online…"),10000);
+db.collection("ranking").orderBy("p","desc").limit(20).onSnapshot(sn=>{clearTimeout(tm0);renderOnline(sn.docs)},e=>{clearTimeout(tm0);ost("Ranking online niedostępny ("+(e&&e.code)+").")})})();
+renderOnline([]);
+
 function rankOf(){const max=cnt()*3,p=max?pts*123/max:0;return RK.find(r=>p>=r[0]-1e-9)}
 function updRank(){if(mode!=="ranked")return;const r=rankOf(),e=$("rank");e.innerHTML='<img src="'+RIMG[r[1]]+'" class="ri"> '+r[1];e.style.borderColor=r[3];e.style.background=r[3]+"33";if(lastRk&&lastRk!==r[1]){e.classList.remove("pop");void e.offsetWidth;e.classList.add("pop")}lastRk=r[1];updRkp()}
-function showEnd(){const max=cnt()*3,win=max>0&&pts===max,e=$("end"),rn=mode==="ranked"?rankOf():null;e.classList.toggle("win",win&&!rn);e.style.background=rn?rn[3]+"99":"";$("ecrown").innerHTML=rn?'<img src="'+RIMG[rn[1]]+'" class="rbig">':"👑";$("ecrown").classList.toggle("hide",rn?false:!win);$("etitle").textContent=rn?rn[1]:(win?"Wygrana!":"Koniec gry");$("epts").textContent=pts+" / "+max+" pkt";e.classList.remove("hide");if(rn)saveRun(rn);if(win)fanfare()}
+function showEnd(){const max=cnt()*3,win=max>0&&pts===max,e=$("end"),rn=mode==="ranked"?rankOf():null;e.classList.toggle("win",win&&!rn);e.style.background=rn?rn[3]+"99":"";$("ecrown").innerHTML=rn?'<img src="'+RIMG[rn[1]]+'" class="rbig">':"👑";$("ecrown").classList.toggle("hide",rn?false:!win);$("etitle").textContent=rn?rn[1]:(win?"Wygrana!":"Koniec gry");$("epts").textContent=pts+" / "+max+" pkt";e.classList.remove("hide");if(rn){saveRun(rn);submitScore({p:pts,r:rn[1]})}if(win)fanfare()}
 $("end").onclick=e=>{if(e.target.id==="end")$("end").classList.add("hide")};
 $("eagain").onclick=()=>{$("end").classList.add("hide");setMode(mode)};
 let shown=0,raf,lastOk=0;
